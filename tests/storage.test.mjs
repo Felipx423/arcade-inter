@@ -1,0 +1,53 @@
+import 'fake-indexeddb/auto';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as store from '../src/store.mjs';
+
+test('cadastro, troca de foto, reposição, sorteio atômico e retomada', async () => {
+  const name = `qa-${crypto.randomUUID()}`;
+  let db = await store.openDatabase(name);
+  const photo = new Blob(['foto inicial'], { type: 'image/png' });
+  await store.savePrize(db, { name: 'Caneta', quantity: 10, photo });
+  await store.savePrize(db, { name: 'Camiseta', quantity: 1, photo });
+  let snapshot = await store.readSnapshot(db);
+  const caneta = snapshot.prizes.find(p => p.name === 'Caneta');
+  const camiseta = snapshot.prizes.find(p => p.name === 'Camiseta');
+  const updatedPhoto = new Blob(['foto nova'], { type: 'image/png' });
+  await store.savePrize(db, { id: caneta.id, name: 'Caneta azul', quantity: 10, photo: updatedPhoto });
+  await store.restockPrize(db, camiseta.id);
+  snapshot = await store.readSnapshot(db);
+  assert.equal(snapshot.prizes.find(p => p.id === camiseta.id).quantity, 2);
+  assert.equal(await snapshot.prizes.find(p => p.id === caneta.id).photo.text(), 'foto nova');
+  const results = await Promise.all(Array.from({ length: 8 }, () => store.drawPrize(db, () => 0)));
+  assert.equal(new Set(results.map(r => r.id)).size, 1, 'cliques concorrentes geram uma rodada');
+  snapshot = await store.readSnapshot(db);
+  assert.equal(snapshot.prizes.reduce((n, p) => n + p.quantity, 0), 11);
+  const previous = snapshot.result;
+  db.close(); db = await store.openDatabase(name);
+  snapshot = await store.readSnapshot(db);
+  assert.equal(snapshot.result.id, previous.id);
+  assert.equal(await snapshot.result.photo.text(), await previous.photo.text());
+  assert.equal((await store.drawPrize(db)).id, previous.id, 'reabertura não desconta novamente');
+  await store.clearResult(db);
+  assert.equal((await store.readSnapshot(db)).prizes.reduce((n,p) => n+p.quantity,0), 11);
+  await store.removePrize(db, caneta.id);
+  await store.savePrize(db, { id: camiseta.id, name: 'Último', quantity: 1, photo: null });
+  await assert.rejects(store.drawPrize(db, () => { throw new Error('falha controlada'); }));
+  assert.equal((await store.readSnapshot(db)).prizes[0].quantity, 1, 'falha reverte a transação');
+  const last = await store.drawPrize(db, () => 0);
+  snapshot = await store.readSnapshot(db);
+  assert.equal(snapshot.prizes[0].quantity, 0);
+  assert.equal(snapshot.result.id, last.id);
+  await store.removePrize(db, camiseta.id);
+  assert.equal((await store.readSnapshot(db)).result.id, last.id, 'exclusão preserva resultado');
+  await store.clearResult(db);
+  await assert.rejects(store.drawPrize(db));
+  db.close();
+});
+
+test('cadastro inválido não altera estoque', async () => {
+  const db = await store.openDatabase(`qa-${crypto.randomUUID()}`);
+  for (const quantity of [-1, .5, 100001, NaN]) await assert.rejects(store.savePrize(db, { name: 'Teste', quantity, photo: new Blob(['x']) }));
+  assert.equal((await store.readSnapshot(db)).prizes.length, 0);
+  db.close();
+});

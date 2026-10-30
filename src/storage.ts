@@ -1,0 +1,10 @@
+import * as storage from './store.mjs';
+import type { Prize, Snapshot, DrawResult } from './types';
+export const openDatabase = storage.openDatabase as (name?: string) => Promise<IDBDatabase>;
+export const readSnapshot = storage.readSnapshot as (db: IDBDatabase) => Promise<Snapshot>;
+export const savePrize = storage.savePrize as (db: IDBDatabase, value: {id?: string; name: string; quantity: number; photo: Blob | null}) => Promise<Prize>;
+export const restockPrize = storage.restockPrize as (db: IDBDatabase, id: string) => Promise<void>;
+export const removePrize = storage.removePrize as (db: IDBDatabase, id: string) => Promise<void>;
+export const drawPrize = storage.drawPrize as (db: IDBDatabase) => Promise<DrawResult>;
+export const clearResult = storage.clearResult as (db: IDBDatabase) => Promise<void>;
+export const addExamples = storage.addExamples as (db: IDBDatabase, examples: {name: string; quantity: number; photo: Blob}[]) => Promise<void>;

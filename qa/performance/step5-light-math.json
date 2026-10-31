@@ -1,0 +1,188 @@
+{
+  "shaderWarmupMetrics": {
+    "durationMs": 9950.800000011921,
+    "parallel": true,
+    "materials": 152
+  },
+  "transmissionMetrics": {
+    "passes": 300,
+    "pixelFraction": 0.258984375
+  },
+  "passCosts": {
+    "256x256:23 objects": {
+      "mean": 18.27414966126283,
+      "p95": 36.80000001192093,
+      "p99": 57.69999998807907,
+      "max": 68.09999999403954,
+      "fps": 54.722108472153955,
+      "samples": 294
+    },
+    "256x256:1 objects": {
+      "mean": 0.07299319728702104,
+      "p95": 0.30000001192092896,
+      "p99": 0.699999988079071,
+      "max": 3,
+      "fps": 13699.906801833033,
+      "samples": 1470
+    },
+    "screen:23 objects": {
+      "mean": 28.977551020529805,
+      "p95": 50.69999998807907,
+      "p99": 74.09999999403954,
+      "max": 85.40000000596046,
+      "fps": 34.50947249791838,
+      "samples": 147
+    }
+  },
+  "batchMetrics": {
+    "sources": 169,
+    "batches": 33,
+    "rejected": {}
+  },
+  "mode": "movimento",
+  "durationMs": 11516.299999982119,
+  "viewport": [
+    1280,
+    720
+  ],
+  "drawingBuffer": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "frameMs": {
+    "mean": 78.08992248080497,
+    "p95": 130.09999999403954,
+    "p99": 154.69999998807907,
+    "max": 196.10000002384186,
+    "fps": 12.805749682307685,
+    "samples": 129
+  },
+  "cpuFrameMs": {
+    "mean": 69.02325581441553,
+    "p95": 113.30000001192093,
+    "p99": 133.60000002384186,
+    "max": 137,
+    "fps": 14.487870619849108,
+    "samples": 129
+  },
+  "renderSubmissionMs": {
+    "mean": 67.40930232867714,
+    "p95": 109.90000000596046,
+    "p99": 128.99999997019768,
+    "max": 135.49999997019768,
+    "fps": 14.834747808605961,
+    "samples": 129
+  },
+  "gpuMs": {
+    "mean": 56.8668674137931,
+    "p95": 95.610052,
+    "p99": 114.532499,
+    "max": 123.757291,
+    "fps": 17.584932061115243,
+    "samples": 145
+  },
+  "physicsMs": {
+    "mean": 0.0015503879665404326,
+    "p95": 0,
+    "p99": 0.10000002384185791,
+    "max": 0.10000002384185791,
+    "fps": 644999.8462200532,
+    "samples": 129
+  },
+  "animationMs": {
+    "mean": 0.10620154890903206,
+    "p95": 0.3999999761581421,
+    "p99": 0.5999999940395355,
+    "max": 1.300000011920929,
+    "fps": 9416.058525253331,
+    "samples": 129
+  },
+  "drawCalls": {
+    "mean": 681,
+    "p95": 681,
+    "p99": 681,
+    "max": 681,
+    "fps": 1.4684287812041117,
+    "samples": 129
+  },
+  "triangles": {
+    "mean": 510440,
+    "p95": 510440,
+    "p99": 510440,
+    "max": 510440,
+    "fps": 0.0019590941148812787,
+    "samples": 129
+  },
+  "renderPasses": {
+    "mean": 13,
+    "p95": 13,
+    "p99": 13,
+    "max": 13,
+    "fps": 76.92307692307692,
+    "samples": 129
+  },
+  "geometries": 167,
+  "textures": 23,
+  "materials": 293,
+  "shaders": 38,
+  "sceneGeometryBytes": 11918184,
+  "estimatedSceneTextureBytes": 41935808,
+  "heap": {
+    "used": 40481737,
+    "allocated": 62096005
+  },
+  "gpu": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A721) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "timerSupported": true,
+  "resources": [
+    {
+      "name": "http://127.0.0.1:4178/assets/index-buAboTAg.js",
+      "duration": 146.5
+    },
+    {
+      "name": "http://127.0.0.1:4178/assets/index-DyBGXiiP.css",
+      "duration": 119.90000000596046
+    },
+    {
+      "name": "http://127.0.0.1:4178/icons/joystick.svg",
+      "duration": 15.400000005960464
+    },
+    {
+      "name": "http://127.0.0.1:4178/icons/arrow-right.svg",
+      "duration": 12.100000023841858
+    },
+    {
+      "name": "http://127.0.0.1:4178/icons/package.svg",
+      "duration": 16.299999982118607
+    },
+    {
+      "name": "http://127.0.0.1:4178/icons/x.svg",
+      "duration": 17.299999982118607
+    },
+    {
+      "name": "http://127.0.0.1:4178/fonts/quicksand.ttf",
+      "duration": 129.5
+    },
+    {
+      "name": "http://127.0.0.1:4178/textures/neon-game-sign.png",
+      "duration": 46
+    },
+    {
+      "name": "http://127.0.0.1:4178/textures/poster-wall.png",
+      "duration": 108.59999999403954
+    },
+    {
+      "name": "http://127.0.0.1:4178/textures/arcade-screen.png",
+      "duration": 88.5
+    },
+    {
+      "name": "http://127.0.0.1:4178/textures/arcade-space-screen.png",
+      "duration": 83.59999999403954
+    },
+    {
+      "name": "http://127.0.0.1:4178/textures/enamel-wear.png",
+      "duration": 105.40000000596046
+    }
+  ],
+  "notes": "CPU render submission includes reflectors, shadow and transmission passes. GPU query is asynchronous; absent means unavailable, not zero. Texture memory estimate excludes driver/MSAA/render-target allocations."
+}

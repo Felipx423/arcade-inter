@@ -1,0 +1,160 @@
+{
+  "mode": "cena renderizada",
+  "durationMs": 11545.70000000298,
+  "viewport": [
+    1280,
+    720
+  ],
+  "drawingBuffer": [
+    1600,
+    900
+  ],
+  "dpr": 1.25,
+  "frameMs": {
+    "mean": 81.13790322575838,
+    "p95": 92.90000000596046,
+    "p99": 101.79999999701977,
+    "max": 103.79999999701977,
+    "fps": 12.32469610679483,
+    "samples": 124
+  },
+  "cpuFrameMs": {
+    "mean": 79.96129032380638,
+    "p95": 90.80000001192093,
+    "p99": 93.40000000596046,
+    "max": 102.79999999701977,
+    "fps": 12.506051314960786,
+    "samples": 124
+  },
+  "renderSubmissionMs": {
+    "mean": 79.43709677686134,
+    "p95": 90.50000002980232,
+    "p99": 93.1000000089407,
+    "max": 102.29999999701977,
+    "fps": 12.588576881264911,
+    "samples": 124
+  },
+  "gpuMs": {
+    "mean": 72.9061297266187,
+    "p95": 87.43255,
+    "p99": 111.435416,
+    "max": 135.43125,
+    "fps": 13.716267805598392,
+    "samples": 139
+  },
+  "physicsMs": {
+    "mean": 0.0064516129993623305,
+    "p95": 0.09999999403953552,
+    "p99": 0.10000000894069672,
+    "max": 0.10000000894069672,
+    "fps": 154999.99769032004,
+    "samples": 124
+  },
+  "animationMs": {
+    "mean": 0.08709677392917295,
+    "p95": 0.20000000298023224,
+    "p99": 0.29999999701976776,
+    "max": 0.7999999970197678,
+    "fps": 11481.48151633262,
+    "samples": 124
+  },
+  "drawCalls": {
+    "mean": 1285,
+    "p95": 1285,
+    "p99": 1285,
+    "max": 1285,
+    "fps": 0.7782101167315175,
+    "samples": 124
+  },
+  "triangles": {
+    "mean": 481208,
+    "p95": 481208,
+    "p99": 481208,
+    "max": 481208,
+    "fps": 0.002078103439676813,
+    "samples": 124
+  },
+  "renderPasses": {
+    "mean": 13,
+    "p95": 13,
+    "p99": 13,
+    "max": 13,
+    "fps": 76.92307692307692,
+    "samples": 124
+  },
+  "geometries": 303,
+  "textures": 24,
+  "materials": 293,
+  "shaders": 38,
+  "sceneGeometryBytes": 7240256,
+  "estimatedSceneTextureBytes": 41935808,
+  "heap": {
+    "used": 38400236,
+    "allocated": 57380540
+  },
+  "gpu": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A721) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "timerSupported": true,
+  "resources": [
+    {
+      "name": "http://127.0.0.1:4177/assets/index-DMbuhdsi.js",
+      "duration": 49.900000005960464
+    },
+    {
+      "name": "http://127.0.0.1:4177/assets/index-DyBGXiiP.css",
+      "duration": 63
+    },
+    {
+      "name": "http://127.0.0.1:4177/icons/joystick.svg",
+      "duration": 16.799999997019768
+    },
+    {
+      "name": "http://127.0.0.1:4177/icons/arrow-right.svg",
+      "duration": 17.299999997019768
+    },
+    {
+      "name": "http://127.0.0.1:4177/icons/package.svg",
+      "duration": 19.700000002980232
+    },
+    {
+      "name": "http://127.0.0.1:4177/icons/x.svg",
+      "duration": 22.799999997019768
+    },
+    {
+      "name": "http://127.0.0.1:4177/fonts/quicksand.ttf",
+      "duration": 52.900000005960464
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/neon-game-sign.png",
+      "duration": 129.5
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/poster-wall.png",
+      "duration": 65.59999999403954
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/enamel-wear.png",
+      "duration": 45.5
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/arcade-screen.png",
+      "duration": 68.40000000596046
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/arcade-space-screen.png",
+      "duration": 78.5
+    },
+    {
+      "name": "http://127.0.0.1:4177/examples/caneca.svg",
+      "duration": 14.900000005960464
+    },
+    {
+      "name": "http://127.0.0.1:4177/examples/ecobag.svg",
+      "duration": 7.300000011920929
+    },
+    {
+      "name": "http://127.0.0.1:4177/examples/fone.svg",
+      "duration": 23.099999994039536
+    }
+  ],
+  "notes": "CPU render submission includes reflectors, shadow and transmission passes. GPU query is asynchronous; absent means unavailable, not zero. Texture memory estimate excludes driver/MSAA/render-target allocations."
+}

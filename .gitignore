@@ -8,3 +8,5 @@ Thumbs.db
 .vscode/
 .idea/
 coverage/
+qa/performance/baseline-dist/
+qa/performance/full-motion-dist/

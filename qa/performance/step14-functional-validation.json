@@ -1,0 +1,45 @@
+{
+  "acceptance": false,
+  "origin": "http://127.0.0.1:4179",
+  "qaStockOnly": true,
+  "checks": {
+    "firstCapture": {
+      "before": 9,
+      "after": 8,
+      "result": "Caneca — exemplo",
+      "commandsDisabledDuringCapture": true,
+      "consoleErrors": 0
+    },
+    "reload": {
+      "stock": 8,
+      "sameResult": true
+    },
+    "nextRound": {
+      "stock": 8,
+      "noDebit": true
+    },
+    "keyboard": {
+      "afterRightAndDown": "Horizontal 11%, profundidade 10%",
+      "afterLeftAndBackButtons": "Horizontal -5%, profundidade -15%"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "mainControlsVisible": true,
+      "minimumMainTouchArea": [
+        44,
+        44
+      ]
+    },
+    "secondCapture": {
+      "before": 8,
+      "after": 7,
+      "result": "Ecobag — exemplo"
+    }
+  },
+  "limits": [
+    "Sem teste final de 30 FPS: agentes de IA executavam em segundo plano.",
+    "A reprodução visual intermediária de todas as articulações ainda exige revisão com captura por fase.",
+    "Não houve desconexão da internet, pois outros trabalhos dependiam dela; recursos observados no app eram locais."
+  ]
+}

@@ -1,5 +1,16 @@
+import { installTransmissionRegion } from './transmission';
+import { useShaderWarmup } from './useShaderWarmup';
+import { createCapsuleAssets, type CapsuleAssets } from './capsule-assets';
+import { installStaticViews } from './static-view';
+import { installStaticShadows } from './static-shadows';
+import DynamicCylinders from './DynamicCylinders';
+import AnimatedBatches from './AnimatedBatches';
+import { optimizeDirectLighting } from './lighting';
+import StaticBatch from './StaticBatch';
+import PerformancePanel from './PerformancePanel';
+import { profileEnabled, frameCosts } from './performance.mjs';
 import { prefersReducedMotion } from './motion';
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Component, Suspense, memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Environment, Lightformer } from '@react-three/drei';
 import * as THREE from 'three';
@@ -32,13 +43,13 @@ function usePhotoTexture(blob: Blob | undefined) {
   return texture;
 }
 
-function Capsule({ color, topRef }: { color: string; topRef?: React.RefObject<THREE.Group | null> }) {
+function Capsule({ color, topRef, assets }: { color: string; topRef?: React.RefObject<THREE.Group | null>; assets: CapsuleAssets }) {
   return <group>
-    <mesh castShadow receiveShadow><sphereGeometry args={[.25, 32, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} /><meshPhysicalMaterial color="#edf4da" roughness={.1} metalness={.06} transparent opacity={.38} transmission={.55} thickness={.04} ior={1.47} clearcoat={1} clearcoatRoughness={.08} depthWrite={false} /></mesh>
+    <mesh castShadow receiveShadow geometry={assets.lower} material={assets.bottom} dispose={null} />
     <group ref={topRef} position={[0, 0, -.25]}>
-      <mesh position={[0, 0, .25]} castShadow><sphereGeometry args={[.25, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshPhysicalMaterial color={color} transparent={color === colors[3]} opacity={color === colors[3] ? .42 : 1} transmission={color === colors[3] ? .5 : 0} thickness={.04} roughness={.16} metalness={.04} clearcoat={1} clearcoatRoughness={.08} /></mesh>
+      <mesh position={[0, 0, .25]} castShadow geometry={assets.upper} material={assets.tops.get(color)} dispose={null} />
     </group>
-    <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.25, .008, 8, 40]} /><meshPhysicalMaterial color="#e1e3c9" transparent opacity={.55} roughness={.19} /></mesh>
+    <mesh rotation={[Math.PI / 2, 0, 0]} geometry={assets.band} material={assets.seam} dispose={null} />
   </group>;
 }
 
@@ -49,6 +60,15 @@ interface SceneProps {
   onPositions: (poses: CapsulePose[]) => void;
   onReady: () => void; onUnavailable: () => void; onStatus: (value: string) => void;
 }
+
+const SceneEnvironment = memo(function SceneEnvironment() {
+  return (    <Environment resolution={128} frames={1}>
+      <Lightformer intensity={3} color="#fff0ce" position={[0, 5, 2.5]} scale={[3, .25, 1]} />
+      <Lightformer intensity={1.5} color="#b2d7ff" position={[-4, 4, 2]} rotation={[0, Math.PI / 3, 0]} scale={[1, 6, 1]} />
+      <Lightformer intensity={1.2} color="#dd8ada" position={[5, 3, -1]} rotation={[0, -Math.PI / 2, 0]} scale={[1, 5, 1]} />
+      <Lightformer intensity={.7} color="#c9d3dc" position={[0, 2, 6]} scale={[4, 4, 1]} />
+    </Environment>);
+});
 
 function CameraFit() {
   const { camera, size, invalidate } = useThree();
@@ -64,8 +84,12 @@ function CameraFit() {
 }
 
 function World(props: SceneProps) {
-  const { invalidate, gl, size } = useThree();
+  const { invalidate, gl, size, scene } = useThree();
+  const renderReady=useShaderWarmup(props.onReady, props.onUnavailable);
+  const capsuleAssets=useMemo(()=>createCapsuleAssets(colors),[]);
+  useEffect(()=>()=>capsuleAssets.dispose(),[capsuleAssets]);
   const shadowSize = size.width < 600 ? 1024 : 2048;
+  useEffect(() => installTransmissionRegion(gl), [gl]);
   const claw = useRef<THREE.Group>(null);
   const cable = useRef<THREE.Group>(null);
   const carriage = useRef<THREE.Group>(null);
@@ -82,6 +106,7 @@ function World(props: SceneProps) {
   const delivered = useRef(false);
   const lastStatus = useRef('');
   const idle = useRef(new THREE.Vector3(0, 4.65, 0));
+  const idleTarget=useRef(new THREE.Vector3());
   const drag = useRef<{ x: number; y: number; aim: Aim } | null>(null);
   const capsuleCount = Math.min(12, props.capture?.count ?? props.total);
   const positions = useMemo(() => capsulePositions(capsuleCount), [capsuleCount]);
@@ -94,12 +119,19 @@ function World(props: SceneProps) {
     previousWorld.current = next;
     return next;
   }, [positions, reducedMotion]);
+  const poseBuffer=useMemo(()=>world.balls.map(({x,y,z})=>({x,y,z})),[world]);
+  useEffect(() => {
+    const seen = new Set<THREE.Material>(); const restore: (() => void)[] = [];
+    scene.traverse(object => { const m = (object as THREE.Mesh).material; for (const material of Array.isArray(m) ? m : m ? [m] : []) { if (material instanceof THREE.MeshStandardMaterial && !seen.has(material)) { seen.add(material); restore.push(optimizeDirectLighting(material)); } } });
+    invalidate(); return () => restore.forEach(fn => fn());
+  }, [scene, capsuleCount, invalidate]);
+  useEffect(()=>installStaticShadows(gl,scene),[gl,scene]);
+  useEffect(()=>installStaticViews(gl,scene,invalidate),[gl,scene,invalidate]);
   const photo = usePhotoTexture(props.capture?.result.photo || props.result?.photo);
   const chosenColor = useRef(colors[0]);
   const fingerGeometry = useMemo(() => new THREE.ExtrudeGeometry((() => { const s = new THREE.Shape(); s.moveTo(-.015,.01); s.lineTo(.022,.01); s.bezierCurveTo(.29,-.15,.40,-.38,.25,-.59); s.lineTo(.18,-.66); s.lineTo(.20,-.59); s.bezierCurveTo(.33,-.40,.26,-.19,-.015,.01); return s; })(), { depth: .036, bevelEnabled: true, bevelSize: .012, bevelThickness: .009, bevelSegments: 3, steps: 1 }), []);
   useEffect(() => () => fingerGeometry.dispose(), [fingerGeometry]);
   useEffect(() => {
-    props.onReady();
     const lost = (event: Event) => { event.preventDefault(); props.onUnavailable(); };
     gl.domElement.addEventListener('webglcontextlost', lost);
     return () => gl.domElement.removeEventListener('webglcontextlost', lost);
@@ -114,6 +146,7 @@ function World(props: SceneProps) {
   }, [props.capture, props.result, positions, world, reducedMotion, invalidate]);
 
   useFrame((_, delta) => {
+    const animationStart = profileEnabled ? performance.now() : 0;
     const dt = Math.min(delta, .05);
     let cx = props.aim.x; let cz = props.aim.z; let cy = 4.65; let grip = 0; let held = false; let open = 0; let showCard = false;
     let capsulePos: V3 = [0, .54, 1.57];
@@ -156,7 +189,7 @@ function World(props: SceneProps) {
       invalidate();
       idle.current.set(cx, cy, cz);
     } else {
-      const target = props.result ? new THREE.Vector3(0, 4.65, -.4) : new THREE.Vector3(props.aim.x, 4.65, props.aim.z);
+      const target = idleTarget.current.set(props.result?0:props.aim.x,4.65,props.result?-.4:props.aim.z);
       idle.current.lerp(target, 1 - Math.exp(-dt * 13));
       cx = idle.current.x; cy = idle.current.y; cz = idle.current.z;
       if (idle.current.distanceTo(target) > .001) invalidate();
@@ -164,12 +197,14 @@ function World(props: SceneProps) {
       world.balls.forEach(ball => { ball.hidden = false; });
     }
     const obstacle = props.capture && cy < 3.85 ? { x: cx, y: cy - .66, z: cz, radius: .31 } : undefined;
+    const physicsStart = profileEnabled ? performance.now() : 0;
     if (advanceWorld(world, delta, props.capture?.targetIndex ?? -1, obstacle)) invalidate();
+    if (profileEnabled) frameCosts.physics = performance.now() - physicsStart;
     pool.current?.children.forEach((child, i) => {
       const ball = world.balls[i]; if (!ball) return;
       child.visible = !ball.hidden; child.position.set(ball.x, ball.y, ball.z); child.rotation.set(ball.rx, ball.ry, ball.rz);
     });
-    props.onPositions(world.balls.map(({ x, y, z }) => ({ x, y, z })));
+    world.balls.forEach((ball,i)=>{const pose=poseBuffer[i];pose.x=ball.x;pose.y=ball.y;pose.z=ball.z;});props.onPositions(poseBuffer);
     claw.current?.position.set(cx, cy, cz);
     carriage.current?.position.set(cx, 5.10, cz);
     if (cable.current) { const length = Math.max(.04, 5.10 - cy); cable.current.scale.y = length; cable.current.position.set(cx, cy + length / 2, cz); }
@@ -184,6 +219,7 @@ function World(props: SceneProps) {
       selection.current.visible = Boolean(p) && props.interactive && !props.result;
       if (p) selection.current.position.set(p.x, 2.135, p.z);
     }
+    if (profileEnabled) frameCosts.animation = performance.now() - animationStart - frameCosts.physics;
   });
 
   const pointerStart = (e: ThreeEvent<PointerEvent>) => {
@@ -192,6 +228,9 @@ function World(props: SceneProps) {
     drag.current = { x: e.clientX, y: e.clientY, aim: { ...props.aim } };
   };
   return <>
+    <DynamicCylinders />
+    <AnimatedBatches revision={capsuleCount} />
+    {profileEnabled && <PerformancePanel ready={renderReady} onAim={props.onAim} onGrab={props.onGrab} capture={props.capture} canCapture={props.canGrab} onError={props.onUnavailable} />}
     <CameraFit />
     <color attach="background" args={['#080d1b']} />
     <fog attach="fog" args={['#080d1b', 11, 28]} />
@@ -204,14 +243,9 @@ function World(props: SceneProps) {
     <pointLight position={[-2.2, 3, 3]} color="#157bff" intensity={21} distance={7} />
     <pointLight position={[3, 3.6, 1]} color="#ff309b" intensity={10} distance={6} />
     <pointLight position={[0,5.9,1.7]} color="#56D867" intensity={2} distance={2.5} />
-    <Environment resolution={128} frames={1}>
-      <Lightformer intensity={3} color="#fff0ce" position={[0, 5, 2.5]} scale={[3, .25, 1]} />
-      <Lightformer intensity={1.5} color="#b2d7ff" position={[-4, 4, 2]} rotation={[0, Math.PI / 3, 0]} scale={[1, 6, 1]} />
-      <Lightformer intensity={1.2} color="#dd8ada" position={[5, 3, -1]} rotation={[0, -Math.PI / 2, 0]} scale={[1, 5, 1]} />
-      <Lightformer intensity={.7} color="#c9d3dc" position={[0, 2, 6]} scale={[4, 4, 1]} />
-    </Environment>
+    <SceneEnvironment />
     <ArcadeRoom />
-    <Cabinet />
+    <StaticBatch cacheView><Cabinet /></StaticBatch>
     {[-.93, .93].map(z => <group key={z}>
       <Block size={[3.22, .09, .13]} position={[0, 5.10, z]} color="#646c66" metal={.92} rough={.27} radius={.015} />
       <Cylinder position={[0, 5.16, z]} radius={.028} height={3.12} rotation={[0,0,Math.PI/2]} />
@@ -223,7 +257,7 @@ function World(props: SceneProps) {
     </group>
     <group ref={cable}>
       <mesh><cylinderGeometry args={[.017,.017,1,12]} /><meshStandardMaterial color="#333a36" roughness={.42} metalness={.65} /></mesh>
-      {Array.from({length:18},(_,i) => <mesh key={i} position={[0,-.48+i*.055,0]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[.042,.012,5,12]} /><meshStandardMaterial color="#262d29" roughness={.44} metalness={.6} /></mesh>)}
+      <StaticBatch>{Array.from({length:18},(_,i) => <mesh key={i} position={[0,-.48+i*.055,0]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[.042,.012,5,12]} /><meshStandardMaterial color="#262d29" roughness={.44} metalness={.6} /></mesh>)}</StaticBatch>
     </group>
     <group ref={claw} position={[0, 4.65, 0]}>
       <Cylinder position={[0,.04,0]} radius={.11} height={.30} color="#a8b1ab" />
@@ -248,11 +282,11 @@ function World(props: SceneProps) {
         }}
         onPointerOver={() => { if (props.interactive) gl.domElement.style.cursor = 'pointer'; }}
         onPointerOut={() => { gl.domElement.style.cursor = ''; }}>
-        <Capsule color={colors[world.balls[i]?.colorIndex ?? i % colors.length]} />
+        <Capsule assets={capsuleAssets} color={colors[world.balls[i]?.colorIndex ?? i % colors.length]} />
       </group>)}
     </group>
     <mesh ref={selection} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[.29, .315, 40]} /><meshBasicMaterial color={mint} transparent opacity={.85} side={THREE.DoubleSide} toneMapped={false} /></mesh>
-    <group ref={movingCapsule} visible={false}><Capsule color={chosenColor.current} topRef={movingTop} /></group>
+    <group ref={movingCapsule} visible={false} userData={{individualDraw:true}}><Capsule assets={capsuleAssets} color={chosenColor.current} topRef={movingTop} /></group>
     <group ref={card} visible={false} position={[0, 1.04, 1.72]}>
       <Block size={[.87, .78, .055]} color="#f5ede5" radius={.06} metal={.1} />
       {photo && <mesh position={[0, .025, .035]}><planeGeometry args={[.70, .70]} /><meshBasicMaterial map={photo} toneMapped={false} /></mesh>}

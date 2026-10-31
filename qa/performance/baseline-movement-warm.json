@@ -1,0 +1,160 @@
+{
+  "mode": "movimento",
+  "durationMs": 11608.09999999404,
+  "viewport": [
+    1280,
+    720
+  ],
+  "drawingBuffer": [
+    1600,
+    900
+  ],
+  "dpr": 1.25,
+  "frameMs": {
+    "mean": 92.44818181815472,
+    "p95": 112.70000000298023,
+    "p99": 116.6000000089407,
+    "max": 123,
+    "fps": 10.81687038439541,
+    "samples": 110
+  },
+  "cpuFrameMs": {
+    "mean": 83.66272727237507,
+    "p95": 98.80000001192093,
+    "p99": 104.90000000596046,
+    "max": 108.09999999403954,
+    "fps": 11.952754023238661,
+    "samples": 110
+  },
+  "renderSubmissionMs": {
+    "mean": 83.15727272629738,
+    "p95": 98.50000004470348,
+    "p99": 104.6000000089407,
+    "max": 107.69999998807907,
+    "fps": 12.025406404216564,
+    "samples": 110
+  },
+  "gpuMs": {
+    "mean": 80.00832814634148,
+    "p95": 94.2975,
+    "p99": 111.961822,
+    "max": 119.42901,
+    "fps": 12.498698862584929,
+    "samples": 123
+  },
+  "physicsMs": {
+    "mean": 0.0009090909903699702,
+    "p95": 0,
+    "p99": 0,
+    "max": 0.10000000894069672,
+    "fps": 1099999.901652345,
+    "samples": 110
+  },
+  "animationMs": {
+    "mean": 0.10272727229378441,
+    "p95": 0.20000000298023224,
+    "p99": 0.4000000059604645,
+    "max": 0.4000000059604645,
+    "fps": 9734.51331541396,
+    "samples": 110
+  },
+  "drawCalls": {
+    "mean": 1291.5636363636363,
+    "p95": 1304,
+    "p99": 1304,
+    "max": 1304,
+    "fps": 0.7742553071681965,
+    "samples": 110
+  },
+  "triangles": {
+    "mean": 481286.7636363636,
+    "p95": 481436,
+    "p99": 481436,
+    "max": 481436,
+    "fps": 0.0020777633534828526,
+    "samples": 110
+  },
+  "renderPasses": {
+    "mean": 19.563636363636363,
+    "p95": 32,
+    "p99": 32,
+    "max": 32,
+    "fps": 51.11524163568774,
+    "samples": 110
+  },
+  "geometries": 475,
+  "textures": 24,
+  "materials": 293,
+  "shaders": 38,
+  "sceneGeometryBytes": 7240256,
+  "estimatedSceneTextureBytes": 41935808,
+  "heap": {
+    "used": 43137216,
+    "allocated": 80836356
+  },
+  "gpu": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A721) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "timerSupported": true,
+  "resources": [
+    {
+      "name": "http://127.0.0.1:4177/assets/index-DMbuhdsi.js",
+      "duration": 49.900000005960464
+    },
+    {
+      "name": "http://127.0.0.1:4177/assets/index-DyBGXiiP.css",
+      "duration": 63
+    },
+    {
+      "name": "http://127.0.0.1:4177/icons/joystick.svg",
+      "duration": 16.799999997019768
+    },
+    {
+      "name": "http://127.0.0.1:4177/icons/arrow-right.svg",
+      "duration": 17.299999997019768
+    },
+    {
+      "name": "http://127.0.0.1:4177/icons/package.svg",
+      "duration": 19.700000002980232
+    },
+    {
+      "name": "http://127.0.0.1:4177/icons/x.svg",
+      "duration": 22.799999997019768
+    },
+    {
+      "name": "http://127.0.0.1:4177/fonts/quicksand.ttf",
+      "duration": 52.900000005960464
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/neon-game-sign.png",
+      "duration": 129.5
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/poster-wall.png",
+      "duration": 65.59999999403954
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/enamel-wear.png",
+      "duration": 45.5
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/arcade-screen.png",
+      "duration": 68.40000000596046
+    },
+    {
+      "name": "http://127.0.0.1:4177/textures/arcade-space-screen.png",
+      "duration": 78.5
+    },
+    {
+      "name": "http://127.0.0.1:4177/examples/caneca.svg",
+      "duration": 14.900000005960464
+    },
+    {
+      "name": "http://127.0.0.1:4177/examples/ecobag.svg",
+      "duration": 7.300000011920929
+    },
+    {
+      "name": "http://127.0.0.1:4177/examples/fone.svg",
+      "duration": 23.099999994039536
+    }
+  ],
+  "notes": "CPU render submission includes reflectors, shadow and transmission passes. GPU query is asynchronous; absent means unavailable, not zero. Texture memory estimate excludes driver/MSAA/render-target allocations."
+}

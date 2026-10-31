@@ -1,0 +1,264 @@
+{
+  "staticViewMetrics": {
+    "builds": 3,
+    "hits": 389,
+    "shadowInvalidations": 0,
+    "meshes": 44,
+    "bytes": 37896192,
+    "occluded": 15,
+    "depthGrids": 3,
+    "depthRanges": [
+      {
+        "minimum": 0.04582369600675678,
+        "covered": 359,
+        "pixels": 1024
+      },
+      {
+        "minimum": 0.9810266483441977,
+        "covered": 14148,
+        "pixels": 14400
+      },
+      {
+        "minimum": 0.008338630696453493,
+        "covered": 132,
+        "pixels": 1024
+      }
+    ]
+  },
+  "shaderWarmupMetrics": {
+    "durationMs": 40905.30000001192,
+    "parallel": true,
+    "materials": 110
+  },
+  "transmissionMetrics": {
+    "passes": 239,
+    "pixelFraction": 0.31646592881944446
+  },
+  "passCosts": {
+    "256x256:30 objects": {
+      "mean": 11.542441860014616,
+      "p95": 27.099999994039536,
+      "p99": 41.20000001788139,
+      "max": 49,
+      "fps": 86.63678033884709,
+      "samples": 172
+    },
+    "256x256:1 objects": {
+      "mean": 0.135581395203291,
+      "p95": 0.5,
+      "p99": 1.0999999940395355,
+      "max": 7.199999988079071,
+      "fps": 7375.643232617559,
+      "samples": 860
+    },
+    "screen:30 objects": {
+      "mean": 23.86511628017869,
+      "p95": 36.39999997615814,
+      "p99": 48.89999997615814,
+      "max": 48.89999997615814,
+      "fps": 41.90216331904303,
+      "samples": 86
+    }
+  },
+  "batchMetrics": {
+    "sources": 168,
+    "batches": 17,
+    "rejected": {}
+  },
+  "mode": "captura",
+  "durationMs": 5564.5,
+  "viewport": [
+    1280,
+    720
+  ],
+  "drawingBuffer": [
+    1280,
+    720
+  ],
+  "dpr": 1,
+  "frameMs": {
+    "mean": 63.570930232488834,
+    "p95": 90.2999999821186,
+    "p99": 105.10000002384186,
+    "max": 105.10000002384186,
+    "fps": 15.730460390352063,
+    "samples": 86
+  },
+  "cpuFrameMs": {
+    "mean": 55.791860467126206,
+    "p95": 76.7999999821186,
+    "p99": 82.89999997615814,
+    "max": 82.89999997615814,
+    "fps": 17.923761488276988,
+    "samples": 86
+  },
+  "renderSubmissionMs": {
+    "mean": 48.30581395224083,
+    "p95": 65.89999997615814,
+    "p99": 78.5,
+    "max": 78.5,
+    "fps": 20.701441880032984,
+    "samples": 86
+  },
+  "gpuMs": {
+    "mean": 38.584635,
+    "p95": 38.584635,
+    "p99": 38.584635,
+    "max": 38.584635,
+    "fps": 25.917052215214685,
+    "samples": 1
+  },
+  "physicsMs": {
+    "mean": 0.22325581346833429,
+    "p95": 0.6000000238418579,
+    "p99": 3.399999976158142,
+    "max": 3.399999976158142,
+    "fps": 4479.166676400281,
+    "samples": 86
+  },
+  "animationMs": {
+    "mean": 0.2546511638996213,
+    "p95": 0.6000000238418579,
+    "p99": 1.2999999821186066,
+    "max": 1.2999999821186066,
+    "fps": 3926.9406221688478,
+    "samples": 86
+  },
+  "drawCalls": {
+    "mean": 192.41860465116278,
+    "p95": 203,
+    "p99": 203,
+    "max": 203,
+    "fps": 5.197002658931593,
+    "samples": 86
+  },
+  "triangles": {
+    "mean": 204271.11627906977,
+    "p95": 207224,
+    "p99": 208020,
+    "max": 208020,
+    "fps": 0.004895454718296182,
+    "samples": 86
+  },
+  "renderPasses": {
+    "mean": 13,
+    "p95": 13,
+    "p99": 13,
+    "max": 13,
+    "fps": 76.92307692307692,
+    "samples": 86
+  },
+  "geometries": 85,
+  "textures": 40,
+  "materials": 328,
+  "shaders": 95,
+  "sceneGeometryBytes": 12809952,
+  "estimatedSceneTextureBytes": 43333909.333333336,
+  "heap": {
+    "used": 47676265,
+    "allocated": 53100473
+  },
+  "gpu": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A721) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "timerSupported": true,
+  "resources": [
+    {
+      "name": "http://127.0.0.1:4179/assets/index-Bm0qBOhf.js",
+      "duration": 333
+    },
+    {
+      "name": "http://127.0.0.1:4179/assets/index-DyBGXiiP.css",
+      "duration": 334.69999998807907
+    },
+    {
+      "name": "http://127.0.0.1:4179/fonts/quicksand.ttf",
+      "duration": 96.5
+    },
+    {
+      "name": "http://127.0.0.1:4179/icons/joystick.svg",
+      "duration": 49.69999998807907
+    },
+    {
+      "name": "http://127.0.0.1:4179/icons/arrow-right.svg",
+      "duration": 49.900000005960464
+    },
+    {
+      "name": "http://127.0.0.1:4179/icons/package.svg",
+      "duration": 51.5
+    },
+    {
+      "name": "http://127.0.0.1:4179/icons/x.svg",
+      "duration": 50
+    },
+    {
+      "name": "http://127.0.0.1:4179/textures/neon-game-sign.png",
+      "duration": 38.80000001192093
+    },
+    {
+      "name": "http://127.0.0.1:4179/textures/poster-wall.png",
+      "duration": 136.69999998807907
+    },
+    {
+      "name": "http://127.0.0.1:4179/textures/arcade-screen.png",
+      "duration": 57.69999998807907
+    },
+    {
+      "name": "http://127.0.0.1:4179/textures/arcade-space-screen.png",
+      "duration": 71.59999999403954
+    },
+    {
+      "name": "http://127.0.0.1:4179/textures/enamel-wear.png",
+      "duration": 115.5
+    },
+    {
+      "name": "http://127.0.0.1:4179/examples/caneca.svg",
+      "duration": 32.69999998807907
+    },
+    {
+      "name": "http://127.0.0.1:4179/examples/ecobag.svg",
+      "duration": 66
+    },
+    {
+      "name": "http://127.0.0.1:4179/examples/fone.svg",
+      "duration": 26.69999998807907
+    }
+  ],
+  "notes": "CPU render submission includes reflectors, shadow and transmission passes. GPU query is asynchronous; absent means unavailable, not zero. Texture memory estimate excludes driver/MSAA/render-target allocations.",
+  "staticShadowMetrics": {
+    "builds": 0,
+    "copies": 0,
+    "casters": 0
+  },
+  "camera": {
+    "position": [
+      2.5,
+      4.05,
+      8.1
+    ],
+    "projection": [
+      1.4653625988902634,
+      0,
+      0,
+      0,
+      0,
+      2.6050890646938014,
+      0,
+      0,
+      0,
+      0,
+      -1.0040080160320641,
+      -1,
+      0,
+      0,
+      -0.20040080160320642,
+      0
+    ]
+  },
+  "glViewport": [
+    0,
+    0,
+    1280,
+    720
+  ],
+  "acceptance": false,
+  "environmentNote": "Outros agentes de IA estavam trabalhando; medição não libera a meta de 30 FPS."
+}

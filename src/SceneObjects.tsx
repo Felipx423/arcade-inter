@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 import { RoundedBox, useTexture, MeshReflectorMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import StaticBatch from './StaticBatch';
 
 export type V3 = [number, number, number];
 export const palette = { cream: '#FFF8E1', blue: '#001D89', green: '#56D867', chrome: '#bac0bd', black: '#090c13' };
@@ -24,7 +25,7 @@ export function Block({ size, position = [0, 0, 0], color = palette.blue, radius
 }
 
 export function Cylinder({ position, radius = .1, height = .1, color = palette.chrome, rotation, emissive, metal = .85 }: { position: V3; radius?: number; height?: number; color?: string; rotation?: V3; emissive?: string; metal?: number }) {
-  return <mesh position={position} rotation={rotation} castShadow receiveShadow><cylinderGeometry args={[radius, radius, height, 24]} /><meshPhysicalMaterial color={color} roughness={.25} metalness={metal} clearcoat={.4} emissive={emissive || '#000000'} emissiveIntensity={emissive ? .9 : 0} /></mesh>;
+  return <mesh position={position} rotation={rotation} userData={{pegaCylinder:{radius,height}}} castShadow receiveShadow><cylinderGeometry args={[radius, radius, height, 24]} /><meshPhysicalMaterial color={color} roughness={.25} metalness={metal} clearcoat={.4} emissive={emissive || '#000000'} emissiveIntensity={emissive ? .9 : 0} /></mesh>;
 }
 
 function Screw({ position, rotation = [Math.PI / 2, 0, 0] }: { position: V3; rotation?: V3 }) {
@@ -47,7 +48,7 @@ function Mirror({ position, size, rotation, reflect = false }: { position: V3; s
   return <mesh position={position} rotation={rotation} receiveShadow><planeGeometry args={size} />{reflect ? <MeshReflectorMaterial map={backdrop} resolution={256} blur={[12,12]} mixBlur={.5} mirror={.55} mixStrength={.65} color="#938570" metalness={.55} roughness={.23} /> : <meshStandardMaterial color="#949c8b" roughness={.27} metalness={.75} envMapIntensity={.5} />}</mesh>;
 }
 
-export function Cabinet() {
+export const Cabinet = memo(function Cabinet() {
   const cream = palette.cream;
   const poster = useTexture('/textures/poster-wall.png'); poster.colorSpace = THREE.SRGBColorSpace;
   return <group>
@@ -110,7 +111,7 @@ export function Cabinet() {
     {Array.from({length:6}, (_,row) => Array.from({length:7},(_,col) => <mesh key={`${row}-${col}`} position={[-1.36+col*.073,1.29+row*.068,1.292]}><circleGeometry args={[.019,8]} /><meshBasicMaterial color="#080e1e" /></mesh>))}
     <mesh position={[1.3, 2.19, .72]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.31, .026, 10, 36]} /><meshStandardMaterial color="#828b7b" metalness={.82} roughness={.3} /></mesh>
   </group>;
-}
+});
 
 function Arcade({ position, rotation = 0, right = false }: { position: V3; rotation?: number; right?: boolean }) {
   const stickers = useTexture('/textures/poster-wall.png'); stickers.colorSpace = THREE.SRGBColorSpace;
@@ -118,7 +119,7 @@ function Arcade({ position, rotation = 0, right = false }: { position: V3; rotat
   const shape = useMemo(() => new THREE.Shape([
     new THREE.Vector2(-1.15, 0), new THREE.Vector2(-1.15, 1.65), new THREE.Vector2(-1.68, 1.99), new THREE.Vector2(-1.55, 2.30), new THREE.Vector2(-.94, 2.52), new THREE.Vector2(-.71, 5.23), new THREE.Vector2(-.98, 5.67), new THREE.Vector2(-.54, 6.06), new THREE.Vector2(1.02, 6.06), new THREE.Vector2(1.02, 0)
   ]), []);
-  return <group position={position} rotation={[0, rotation, 0]} scale={[1,1.1,1]}>
+  return <StaticBatch cacheView><group position={position} rotation={[0, rotation, 0]} scale={[1,1.1,1]}>
     <Block size={[2.53, 5.85, 1.8]} position={[0,2.94,-.13]} color="#07111c" />
     {[-1.22,1.22].map(x => <mesh key={x} position={[x-.045,0,0]} rotation={[0,Math.PI/2,0]} castShadow receiveShadow><extrudeGeometry args={[shape,{depth:.10,bevelEnabled:true,bevelSize:.035,bevelThickness:.025,bevelSegments:2,steps:1}]} /><Enamel color="#095ca0" rough={.31} metal={.48} /></mesh>)}
     <mesh position={[right ? -1.29 : 1.29,3.65,.65]} rotation={[0,right ? -Math.PI/2 : Math.PI/2,0]}><planeGeometry args={[.46,3.9]} /><meshStandardMaterial map={stickers} color="#6b7d86" roughness={.8} /></mesh>
@@ -144,13 +145,13 @@ function Arcade({ position, rotation = 0, right = false }: { position: V3; rotat
     <Block size={[.065,.32,.025]} position={[.33,1.23,1.334]} color="#070e12" />
     <Block size={[.3,.13,.035]} position={[.33,.88,1.339]} color="#0c1319" />
     <pointLight position={[0,3.8,1.6]} color={right ? '#9850ff' : '#197cff'} intensity={5} distance={3} />
-  </group>;
+  </group></StaticBatch>;
 }
 
-export function ArcadeRoom() {
+export const ArcadeRoom = memo(function ArcadeRoom() {
   const neon = useTexture('/textures/neon-game-sign.png'); neon.colorSpace=THREE.SRGBColorSpace;
   const wall = useTexture('/textures/poster-wall.png'); wall.colorSpace=THREE.SRGBColorSpace; wall.anisotropy=4;
-  return <group>
+  return <group userData={{staticScenery:true,staticArcade:true}}>
     <mesh position={[0,3.3,-3.2]} receiveShadow><planeGeometry args={[16,9]} /><meshStandardMaterial map={wall} color="#9a91a5" roughness={.94} /></mesh>
     <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.015,0]} receiveShadow><planeGeometry args={[28,25]} /><MeshReflectorMaterial resolution={256} blur={[220,100]} mixBlur={1} mirror={.16} mixStrength={.65} depthScale={.3} minDepthThreshold={.5} maxDepthThreshold={1.5} color="#171c2b" metalness={.58} roughness={.38} /></mesh>
     <mesh position={[-5.05,3.85,-2.91]}><planeGeometry args={[.59,1.77]} /><meshBasicMaterial map={neon} toneMapped={false} /></mesh>
@@ -167,4 +168,4 @@ export function ArcadeRoom() {
     <Cylinder position={[-2.36,.55,-1.7]} radius={.045} height={1.0} color="#777a81" />
     <Cylinder position={[-2.36,.07,-1.7]} radius={.34} height={.05} color="#444953" />
   </group>;
-}
+});

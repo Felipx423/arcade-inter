@@ -34,9 +34,15 @@ export function useShaderWarmup(onReady: () => void, onError: () => void) {
     if(s.frames++<2){invalidate();return;}
     s.phase='compiling';
     s.start=performance.now();const compilation=compilationView(scene),visible=compilation.view;
+    const liveView=new THREE.Group(),bakeView=new THREE.Group();
     const materials=new Set<THREE.Material>();
     scene.updateMatrixWorld(true);
-    for(const object of visible.children){const mesh=object as THREE.Mesh;for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])materials.add(material);}
+    for(const object of visible.children){
+      const mesh=object as THREE.Mesh;
+      for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])materials.add(material);
+      if(object.userData.warmBakeOnly)bakeView.children.push(object);
+      else liveView.children.push(object);
+    }
     shaderWarmupMetrics.materials=materials.size;
     shaderWarmupMetrics.parallel=gl.extensions.has('KHR_parallel_shader_compile');
     const linear=new THREE.WebGLRenderTarget(16,16,{type:THREE.HalfFloatType});
@@ -44,20 +50,23 @@ export function useShaderWarmup(onReady: () => void, onError: () => void) {
     let tasks: Promise<unknown>[];
     const fog=scene.fog;
     try {
-      const screen=gl.compileAsync(visible,camera,scene);
+      const screen=gl.compileAsync(liveView,camera,scene);
       gl.setRenderTarget(linear);
-      const reflection=gl.compileAsync(visible,camera,scene);
-      scene.fog=null;
-      const cache=gl.compileAsync(visible,camera,scene);scene.fog=fog;
+      const reflection=gl.compileAsync(liveView,camera,scene);
+      tasks=[screen,reflection];
+      if(bakeView.children.length>0){
+        scene.fog=null;
+        tasks.push(gl.compileAsync(bakeView,camera,scene));
+        scene.fog=fog;
+      }
       gl.setRenderTarget(previous);
-      tasks=[screen,reflection,cache];
-    } catch(error){linear.dispose();compilation.release();s.phase='failed';callbacks.current.onError();console.error(error);return;}
+    } catch(error){liveView.children.length=0;bakeView.children.length=0;linear.dispose();compilation.release();s.phase='failed';callbacks.current.onError();console.error(error);return;}
     finally{scene.fog=fog;gl.setRenderTarget(previous);}
     void Promise.all(tasks).then(()=>{
-      linear.dispose(); compilation.release();
+      liveView.children.length=0;bakeView.children.length=0;linear.dispose(); compilation.release();
       if(s.cancelled)return;
       s.frames=0;s.phase='priming';invalidate();
-    }).catch(error=>{linear.dispose();compilation.release();if(!s.cancelled){s.phase='failed';callbacks.current.onError();console.error(error);}});
+    }).catch(error=>{liveView.children.length=0;bakeView.children.length=0;linear.dispose();compilation.release();if(!s.cancelled){s.phase='failed';callbacks.current.onError();console.error(error);}});
   },-20);
   return ready;
 }

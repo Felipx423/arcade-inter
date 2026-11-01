@@ -4,7 +4,7 @@ export const staticShadowMetrics={builds:0,copies:0,casters:0};
 
 /** Preserve native depth/filtering; copy fixed casters' depth before drawing moving casters. */
 export function installStaticShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene){
-  if(typeof location!=='undefined' && new URLSearchParams(location.search).has('noShadowCache'))return ()=>{};
+  if(typeof location!=='undefined' && !new URLSearchParams(location.search).has('shadowCache'))return ()=>{};
   const casters=new Set<THREE.Mesh>(),lights:THREE.DirectionalLight[]=[];
   scene.traverse(o=>{
     if(o.userData.staticArcade)o.traverseVisible(child=>{if(child instanceof THREE.Mesh && child.castShadow)casters.add(child);});

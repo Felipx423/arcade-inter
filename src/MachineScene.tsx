@@ -90,6 +90,10 @@ function World(props: SceneProps) {
   useEffect(()=>()=>capsuleAssets.dispose(),[capsuleAssets]);
   const shadowSize = size.width < 600 ? 1024 : 2048;
   useEffect(() => installTransmissionRegion(gl), [gl]);
+  const propsRef = useRef(props);
+  propsRef.current = props;
+  const aimRef = useRef(props.aim);
+  aimRef.current = props.aim;
   const claw = useRef<THREE.Group>(null);
   const cable = useRef<THREE.Group>(null);
   const carriage = useRef<THREE.Group>(null);
@@ -107,6 +111,8 @@ function World(props: SceneProps) {
   const lastStatus = useRef('');
   const idle = useRef(new THREE.Vector3(0, 4.65, 0));
   const idleTarget=useRef(new THREE.Vector3());
+  const smoothDt = useRef(1 / 60);
+  const poolNeedsSync = useRef(true);
   const drag = useRef<{ x: number; y: number; aim: Aim } | null>(null);
   const capsuleCount = Math.min(12, props.capture?.count ?? props.total);
   const positions = useMemo(() => capsulePositions(capsuleCount), [capsuleCount]);
@@ -117,6 +123,7 @@ function World(props: SceneProps) {
     const survivors = previousWorld.current?.balls.filter(b => !b.hidden) ?? [];
     next.balls = next.balls.map((spawn, i) => survivors[i] ? { ...survivors[i] } : spawn);
     previousWorld.current = next;
+    poolNeedsSync.current = true;
     return next;
   }, [positions, reducedMotion]);
   const poseBuffer=useMemo(()=>world.balls.map(({x,y,z})=>({x,y,z})),[world]);
@@ -132,37 +139,45 @@ function World(props: SceneProps) {
   const fingerGeometry = useMemo(() => new THREE.ExtrudeGeometry((() => { const s = new THREE.Shape(); s.moveTo(-.015,.01); s.lineTo(.022,.01); s.bezierCurveTo(.29,-.15,.40,-.38,.25,-.59); s.lineTo(.18,-.66); s.lineTo(.20,-.59); s.bezierCurveTo(.33,-.40,.26,-.19,-.015,.01); return s; })(), { depth: .036, bevelEnabled: true, bevelSize: .012, bevelThickness: .009, bevelSegments: 3, steps: 1 }), []);
   useEffect(() => () => fingerGeometry.dispose(), [fingerGeometry]);
   useEffect(() => {
-    const lost = (event: Event) => { event.preventDefault(); props.onUnavailable(); };
+    const lost = (event: Event) => { event.preventDefault(); propsRef.current.onUnavailable(); };
     gl.domElement.addEventListener('webglcontextlost', lost);
     return () => gl.domElement.removeEventListener('webglcontextlost', lost);
   }, [gl]);
   useEffect(() => { invalidate(); }, [photo, invalidate]);
-  useEffect(() => { invalidate(); }, [world, invalidate]);
+  useEffect(() => { poolNeedsSync.current = true; invalidate(); }, [world, invalidate]);
+  useEffect(() => { invalidate(); }, [props.aim.x, props.aim.z, invalidate]);
   useEffect(() => {
     if (!props.capture && props.result) {
       world.balls = world.balls.map((b, i) => b.hidden ? createBall(positions[i], i, reducedMotion) : b);
-      world.awake = !reducedMotion && world.balls.length > 0; world.quiet = 0; invalidate();
+      world.awake = !reducedMotion && world.balls.length > 0; world.quiet = 0; poolNeedsSync.current = true; invalidate();
     }
   }, [props.capture, props.result, positions, world, reducedMotion, invalidate]);
 
   useFrame((_, delta) => {
     const animationStart = profileEnabled ? performance.now() : 0;
+    const currentProps = propsRef.current;
+    const currentAim = aimRef.current;
     const dt = Math.min(delta, .05);
-    let cx = props.aim.x; let cz = props.aim.z; let cy = 4.65; let grip = 0; let held = false; let open = 0; let showCard = false;
+    smoothDt.current += (dt - smoothDt.current) * 0.35;
+    let cx = currentAim.x; let cz = currentAim.z; let cy = 4.65; let grip = 0; let held = false; let open = 0; let showCard = false;
     let capsulePos: V3 = [0, .54, 1.57];
-    if (props.capture) {
-      const c = props.capture;
+    if (currentProps.capture) {
+      const c = currentProps.capture;
       const isNew = lastCapture.current !== c.id;
       if (isNew) {
         lastCapture.current = c.id; elapsed.current = 0; delivered.current = false; chosenColor.current = colors[world.balls[c.targetIndex]?.colorIndex ?? c.targetIndex % colors.length];
+        const topMesh = movingTop.current?.children[0] as THREE.Mesh | undefined;
+        const nextMat = capsuleAssets.tops.get(chosenColor.current);
+        if (topMesh && nextMat) topMesh.material = nextMat;
         const ball = world.balls[c.targetIndex];
         if (ball) { ball.x = c.target.x; ball.z = c.target.z; ball.y = c.targetY ?? FLOOR_Y; ball.vx = ball.vy = ball.vz = 0; }
+        poolNeedsSync.current = true;
       }
       elapsed.current += isNew ? 0 : delta;
-      const t = props.capture.reduced ? 1 : Math.min(1, elapsed.current / 5.2);
+      const t = currentProps.capture.reduced ? 1 : Math.min(1, elapsed.current / 5.2);
       const p = c.target;
       const captureHeight = (c.targetY ?? FLOOR_Y) + .91;
-      cx = mix(props.aim.x, p.x, t / .12); cz = mix(props.aim.z, p.z, t / .12);
+      cx = mix(currentAim.x, p.x, t / .12); cz = mix(currentAim.z, p.z, t / .12);
       if (t > .12 && t <= .32) cy = mix(4.65, captureHeight, (t - .12) / .20);
       else if (t > .32 && t <= .42) { cy = captureHeight; grip = ease((t - .32) / .10); }
       else if (t > .42 && t <= .60) { cy = mix(captureHeight, 4.65, (t - .42) / .18); grip = 1; held = true; }
@@ -178,33 +193,43 @@ function World(props: SceneProps) {
       open = ease((t - .94) / .06); showCard = t > .95;
       movingCapsule.current!.visible = t > .42;
       const selected = world.balls[c.targetIndex];
-      if (selected) selected.hidden = t > .42;
+      if (selected) {
+        const nextHidden = t > .42;
+        if (selected.hidden !== nextHidden) { selected.hidden = nextHidden; poolNeedsSync.current = true; }
+      }
       if (movingCapsule.current && selected) {
         const blend = 1 - ease((t - .42) / .25);
         movingCapsule.current.rotation.set(selected.rx * blend, selected.ry * blend, selected.rz * blend);
       }
       const status = t < .12 ? 'Ajustando a mira…' : t < .42 ? 'A garra está descendo…' : t < .74 ? 'Pegou! Levando sua surpresa…' : t < .94 ? 'Uma surpresa chegando à saída…' : 'Vamos descobrir seu brinde!';
-      if (status !== lastStatus.current) { lastStatus.current = status; props.onStatus(status); }
-      if (t >= 1 && !delivered.current) { delivered.current = true; props.onDelivered(); }
+      if (status !== lastStatus.current) { lastStatus.current = status; currentProps.onStatus(status); }
+      if (t >= 1 && !delivered.current) { delivered.current = true; currentProps.onDelivered(); }
       invalidate();
       idle.current.set(cx, cy, cz);
     } else {
-      const target = idleTarget.current.set(props.result?0:props.aim.x,4.65,props.result?-.4:props.aim.z);
-      idle.current.lerp(target, 1 - Math.exp(-dt * 13));
+      const target = idleTarget.current.set(currentProps.result?0:currentAim.x,4.65,currentProps.result?-.4:currentAim.z);
+      idle.current.lerp(target, 1 - Math.exp(-smoothDt.current * 13));
       cx = idle.current.x; cy = idle.current.y; cz = idle.current.z;
       if (idle.current.distanceTo(target) > .001) invalidate();
-      movingCapsule.current!.visible = Boolean(props.result); open = props.result ? 1 : 0; showCard = Boolean(props.result);
-      world.balls.forEach(ball => { ball.hidden = false; });
+      movingCapsule.current!.visible = Boolean(currentProps.result); open = currentProps.result ? 1 : 0; showCard = Boolean(currentProps.result);
+      for (let i = 0; i < world.balls.length; i++) {
+        if (world.balls[i].hidden) { world.balls[i].hidden = false; poolNeedsSync.current = true; }
+      }
     }
-    const obstacle = props.capture && cy < 3.85 ? { x: cx, y: cy - .66, z: cz, radius: .31 } : undefined;
+    const obstacle = currentProps.capture && cy < 3.85 ? { x: cx, y: cy - .66, z: cz, radius: .31 } : undefined;
     const physicsStart = profileEnabled ? performance.now() : 0;
-    if (advanceWorld(world, delta, props.capture?.targetIndex ?? -1, obstacle)) invalidate();
+    const ballsMoved = advanceWorld(world, delta, currentProps.capture?.targetIndex ?? -1, obstacle);
+    if (ballsMoved) invalidate();
     if (profileEnabled) frameCosts.physics = performance.now() - physicsStart;
-    pool.current?.children.forEach((child, i) => {
-      const ball = world.balls[i]; if (!ball) return;
-      child.visible = !ball.hidden; child.position.set(ball.x, ball.y, ball.z); child.rotation.set(ball.rx, ball.ry, ball.rz);
-    });
-    world.balls.forEach((ball,i)=>{const pose=poseBuffer[i];pose.x=ball.x;pose.y=ball.y;pose.z=ball.z;});props.onPositions(poseBuffer);
+    if (ballsMoved || poolNeedsSync.current) {
+      poolNeedsSync.current = false;
+      pool.current?.children.forEach((child, i) => {
+        const ball = world.balls[i]; if (!ball) return;
+        child.visible = !ball.hidden; child.position.set(ball.x, ball.y, ball.z); child.rotation.set(ball.rx, ball.ry, ball.rz);
+      });
+      world.balls.forEach((ball,i)=>{const pose=poseBuffer[i];pose.x=ball.x;pose.y=ball.y;pose.z=ball.z;});
+      currentProps.onPositions(poseBuffer);
+    }
     claw.current?.position.set(cx, cy, cz);
     carriage.current?.position.set(cx, 5.10, cz);
     if (cable.current) { const length = Math.max(.04, 5.10 - cy); cable.current.scale.y = length; cable.current.position.set(cx, cy + length / 2, cz); }
@@ -212,99 +237,107 @@ function World(props: SceneProps) {
     movingCapsule.current?.position.set(...capsulePos);
     if (movingTop.current) movingTop.current.rotation.x = -1.9 * open;
     if (card.current) { card.current.visible = showCard && Boolean(photo); card.current.position.set(0, mix(.52, 1.04, open), 1.72); card.current.scale.setScalar(.5 + open * .5); }
-    if (joystick.current) { joystick.current.rotation.z = -props.aim.x * .22; joystick.current.rotation.x = props.aim.z * .30; }
-    if (grabButton.current) grabButton.current.position.y = props.capture ? 2.19 : 2.23;
+    if (joystick.current) { joystick.current.rotation.z = -currentAim.x * .22; joystick.current.rotation.x = currentAim.z * .30; }
+    if (grabButton.current) grabButton.current.position.y = currentProps.capture ? 2.19 : 2.23;
     if (selection.current) {
-      const p = world.balls[nearestCapsule(world.balls, props.aim)];
-      selection.current.visible = Boolean(p) && props.interactive && !props.result;
+      const p = world.balls[nearestCapsule(world.balls, currentAim)];
+      selection.current.visible = Boolean(p) && currentProps.interactive && !currentProps.result;
       if (p) selection.current.position.set(p.x, 2.135, p.z);
     }
     if (profileEnabled) frameCosts.animation = performance.now() - animationStart - frameCosts.physics;
   });
 
-  const pointerStart = (e: ThreeEvent<PointerEvent>) => {
-    if (!props.interactive) return;
-    e.stopPropagation(); (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, aim: { ...props.aim } };
-  };
+  const sceneContent = useMemo(() => {
+    const pointerStart = (e: ThreeEvent<PointerEvent>) => {
+      if (!propsRef.current.interactive) return;
+      e.stopPropagation(); (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      drag.current = { x: e.clientX, y: e.clientY, aim: { ...aimRef.current } };
+    };
+    return <>
+      <DynamicCylinders />
+      <AnimatedBatches revision={capsuleCount} />
+      <CameraFit />
+      <color attach="background" args={['#080d1b']} />
+      <fog attach="fog" args={['#080d1b', 11, 28]} />
+      <ambientLight intensity={.18} color="#bbceef" />
+      <hemisphereLight args={['#7ca5e0', '#191727', .55]} />
+      <directionalLight position={[-3, 7, 6]} color="#87b8ff" intensity={.8} castShadow shadow-mapSize={[shadowSize, shadowSize]} shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={8} shadow-camera-bottom={-2} shadow-normalBias={.018} shadow-bias={-.0002} />
+      <directionalLight position={[0,6,4]} color="#ffe1a8" intensity={1.4} />
+      <pointLight position={[0, 4.75, .63]} color="#ffcb79" intensity={24} distance={5} decay={2} />
+      <pointLight position={[0, 4.6, -.7]} color="#ffe0a4" intensity={10} distance={4} decay={2} />
+      <pointLight position={[-2.2, 3, 3]} color="#157bff" intensity={21} distance={7} />
+      <pointLight position={[3, 3.6, 1]} color="#ff309b" intensity={10} distance={6} />
+      <pointLight position={[0,5.9,1.7]} color="#56D867" intensity={2} distance={2.5} />
+      <SceneEnvironment />
+      <ArcadeRoom />
+      <StaticBatch cacheView>
+        <Cabinet />
+        {[-.93, .93].map(z => <group key={z}>
+          <Block size={[3.22, .09, .13]} position={[0, 5.10, z]} color="#646c66" metal={.92} rough={.27} radius={.015} />
+          <Cylinder position={[0, 5.16, z]} radius={.028} height={3.12} rotation={[0,0,Math.PI/2]} />
+        </group>)}
+      </StaticBatch>
+      <group ref={carriage}>
+        <Block size={[.14,.08,2.00]} color="#616b69" metal={.95} radius={.02} />
+        <Block size={[.39,.20,.38]} position={[0,-.04,0]} color="#7a8177" metal={.8} radius={.035} />
+        {[-.17,.17].map(x => <Cylinder key={x} position={[x,.04,0]} radius={.07} height={.07} rotation={[0,0,Math.PI/2]} color="#2b3130" />)}
+      </group>
+      <group ref={cable}>
+        <mesh><cylinderGeometry args={[.017,.017,1,12]} /><meshStandardMaterial color="#333a36" roughness={.42} metalness={.65} /></mesh>
+        <StaticBatch>{Array.from({length:18},(_,i) => <mesh key={i} position={[0,-.48+i*.055,0]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[.042,.012,5,12]} /><meshStandardMaterial color="#262d29" roughness={.44} metalness={.6} /></mesh>)}</StaticBatch>
+      </group>
+      <group ref={claw} position={[0, 4.65, 0]}>
+        <Cylinder position={[0,.04,0]} radius={.11} height={.30} color="#a8b1ab" />
+        <Cylinder position={[0,-.11,0]} radius={.17} height={.09} />
+        <Cylinder position={[0,.20,0]} radius={.13} height={.045} color="#4e5753" />
+        {[0,1,2].map(i => <group key={i} rotation={[0, i*Math.PI*2/3, 0]}>
+          <Cylinder position={[.093,.015,0]} radius={.021} height={.25} />
+          <group ref={el => { fingers.current[i]=el; }} position={[.12,-.18,0]}>
+            <mesh geometry={fingerGeometry} position={[0,0,-.018]} castShadow><meshPhysicalMaterial color={chrome} roughness={.12} metalness={.98} clearcoat={.25} /></mesh>
+            <Cylinder position={[.01,-.01,0]} radius={.048} height={.09} rotation={[Math.PI/2,0,0]} color="#8d9690" />
+            <Cylinder position={[.01,-.01,.05]} radius={.019} height={.009} rotation={[Math.PI/2,0,0]} color="#444f47" />
+          </group>
+        </group>)}
+      </group>
+      <group ref={pool}>
+        {positions.map((_, i) => <group key={i}
+          onClick={e => {
+            if (!propsRef.current.interactive || reducedMotion) return;
+            e.stopPropagation();
+            const b = world.balls[i];
+            kickBall(world, i, (b.x - e.point.x) * 4 + .30, (b.z - e.point.z) * 4 - .25); invalidate();
+          }}
+          onPointerOver={() => { if (propsRef.current.interactive) gl.domElement.style.cursor = 'pointer'; }}
+          onPointerOut={() => { gl.domElement.style.cursor = ''; }}>
+          <Capsule assets={capsuleAssets} color={colors[world.balls[i]?.colorIndex ?? i % colors.length]} />
+        </group>)}
+      </group>
+      <mesh ref={selection} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[.29, .315, 40]} /><meshBasicMaterial color={mint} transparent opacity={.85} side={THREE.DoubleSide} toneMapped={false} /></mesh>
+      <group ref={movingCapsule} visible={false} userData={{individualDraw:true}}><Capsule assets={capsuleAssets} color={chosenColor.current} topRef={movingTop} /></group>
+      <group ref={card} visible={false} position={[0, 1.04, 1.72]}>
+        <Block size={[.87, .78, .055]} color="#f5ede5" radius={.06} metal={.1} />
+        {photo && <mesh position={[0, .025, .035]}><planeGeometry args={[.70, .70]} /><meshBasicMaterial map={photo} toneMapped={false} /></mesh>}
+      </group>
+      <group ref={joystick} position={[-.67, 2.16, 1.52]}
+        onPointerDown={pointerStart}
+        onPointerMove={e => { if (drag.current && propsRef.current.interactive) { e.stopPropagation(); propsRef.current.onAim({ x: drag.current.aim.x + (e.clientX - drag.current.x) * .012, z: drag.current.aim.z + (e.clientY - drag.current.y) * .012 }); } }}
+        onPointerUp={e => { drag.current = null; (e.target as HTMLElement).releasePointerCapture(e.pointerId); }}
+        onLostPointerCapture={() => { drag.current = null; }}
+        onPointerOver={() => { if (propsRef.current.interactive) gl.domElement.style.cursor = 'grab'; }} onPointerOut={() => { gl.domElement.style.cursor = ''; }}>
+        <Cylinder position={[0, .17, 0]} radius={.045} height={.34} color={chrome} />
+        <mesh position={[0, .36, 0]} castShadow><sphereGeometry args={[.14, 28, 20]} /><meshPhysicalMaterial color={mint} clearcoat={1} roughness={.2} metalness={.15} /></mesh>
+        <mesh position={[0, .28, 0]}><sphereGeometry args={[.25, 12, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
+      </group>
+      <group ref={grabButton} position={[.58, 2.23, 1.53]} onClick={e => { e.stopPropagation(); if (propsRef.current.canGrab) propsRef.current.onGrab(); }} onPointerOver={() => { if (propsRef.current.canGrab) gl.domElement.style.cursor = 'pointer'; }} onPointerOut={() => { gl.domElement.style.cursor = ''; }}>
+        <Cylinder position={[0, 0, 0]} radius={.145} height={.055} color={mint} emissive={mint} />
+        <mesh position={[0,.025,0]} scale={[1,.28,1]}><sphereGeometry args={[.144,24,12]} /><meshPhysicalMaterial color={mint} emissive={mint} emissiveIntensity={.6} roughness={.16} clearcoat={1} /></mesh>
+      </group>
+    </>;
+  }, [capsuleCount, shadowSize, positions, reducedMotion, world, gl, capsuleAssets, fingerGeometry, photo, invalidate]);
+
   return <>
-    <DynamicCylinders />
-    <AnimatedBatches revision={capsuleCount} />
     {profileEnabled && <PerformancePanel ready={renderReady} onAim={props.onAim} onGrab={props.onGrab} capture={props.capture} canCapture={props.canGrab} onError={props.onUnavailable} />}
-    <CameraFit />
-    <color attach="background" args={['#080d1b']} />
-    <fog attach="fog" args={['#080d1b', 11, 28]} />
-    <ambientLight intensity={.18} color="#bbceef" />
-    <hemisphereLight args={['#7ca5e0', '#191727', .55]} />
-    <directionalLight position={[-3, 7, 6]} color="#87b8ff" intensity={.8} castShadow shadow-mapSize={[shadowSize, shadowSize]} shadow-camera-left={-7} shadow-camera-right={7} shadow-camera-top={8} shadow-camera-bottom={-2} shadow-normalBias={.018} shadow-bias={-.0002} />
-    <directionalLight position={[0,6,4]} color="#ffe1a8" intensity={1.4} />
-    <pointLight position={[0, 4.75, .63]} color="#ffcb79" intensity={24} distance={5} decay={2} />
-    <pointLight position={[0, 4.6, -.7]} color="#ffe0a4" intensity={10} distance={4} decay={2} />
-    <pointLight position={[-2.2, 3, 3]} color="#157bff" intensity={21} distance={7} />
-    <pointLight position={[3, 3.6, 1]} color="#ff309b" intensity={10} distance={6} />
-    <pointLight position={[0,5.9,1.7]} color="#56D867" intensity={2} distance={2.5} />
-    <SceneEnvironment />
-    <ArcadeRoom />
-    <StaticBatch cacheView><Cabinet /></StaticBatch>
-    {[-.93, .93].map(z => <group key={z}>
-      <Block size={[3.22, .09, .13]} position={[0, 5.10, z]} color="#646c66" metal={.92} rough={.27} radius={.015} />
-      <Cylinder position={[0, 5.16, z]} radius={.028} height={3.12} rotation={[0,0,Math.PI/2]} />
-    </group>)}
-    <group ref={carriage}>
-      <Block size={[.14,.08,2.00]} color="#616b69" metal={.95} radius={.02} />
-      <Block size={[.39,.20,.38]} position={[0,-.04,0]} color="#7a8177" metal={.8} radius={.035} />
-      {[-.17,.17].map(x => <Cylinder key={x} position={[x,.04,0]} radius={.07} height={.07} rotation={[0,0,Math.PI/2]} color="#2b3130" />)}
-    </group>
-    <group ref={cable}>
-      <mesh><cylinderGeometry args={[.017,.017,1,12]} /><meshStandardMaterial color="#333a36" roughness={.42} metalness={.65} /></mesh>
-      <StaticBatch>{Array.from({length:18},(_,i) => <mesh key={i} position={[0,-.48+i*.055,0]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[.042,.012,5,12]} /><meshStandardMaterial color="#262d29" roughness={.44} metalness={.6} /></mesh>)}</StaticBatch>
-    </group>
-    <group ref={claw} position={[0, 4.65, 0]}>
-      <Cylinder position={[0,.04,0]} radius={.11} height={.30} color="#a8b1ab" />
-      <Cylinder position={[0,-.11,0]} radius={.17} height={.09} />
-      <Cylinder position={[0,.20,0]} radius={.13} height={.045} color="#4e5753" />
-      {[0,1,2].map(i => <group key={i} rotation={[0, i*Math.PI*2/3, 0]}>
-        <Cylinder position={[.093,.015,0]} radius={.021} height={.25} />
-        <group ref={el => { fingers.current[i]=el; }} position={[.12,-.18,0]}>
-          <mesh geometry={fingerGeometry} position={[0,0,-.018]} castShadow><meshPhysicalMaterial color={chrome} roughness={.12} metalness={.98} clearcoat={.25} /></mesh>
-          <Cylinder position={[.01,-.01,0]} radius={.048} height={.09} rotation={[Math.PI/2,0,0]} color="#8d9690" />
-          <Cylinder position={[.01,-.01,.05]} radius={.019} height={.009} rotation={[Math.PI/2,0,0]} color="#444f47" />
-        </group>
-      </group>)}
-    </group>
-    <group ref={pool}>
-      {positions.map((_, i) => <group key={i}
-        onClick={e => {
-          if (!props.interactive || reducedMotion) return;
-          e.stopPropagation();
-          const b = world.balls[i];
-          kickBall(world, i, (b.x - e.point.x) * 4 + .30, (b.z - e.point.z) * 4 - .25); invalidate();
-        }}
-        onPointerOver={() => { if (props.interactive) gl.domElement.style.cursor = 'pointer'; }}
-        onPointerOut={() => { gl.domElement.style.cursor = ''; }}>
-        <Capsule assets={capsuleAssets} color={colors[world.balls[i]?.colorIndex ?? i % colors.length]} />
-      </group>)}
-    </group>
-    <mesh ref={selection} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[.29, .315, 40]} /><meshBasicMaterial color={mint} transparent opacity={.85} side={THREE.DoubleSide} toneMapped={false} /></mesh>
-    <group ref={movingCapsule} visible={false} userData={{individualDraw:true}}><Capsule assets={capsuleAssets} color={chosenColor.current} topRef={movingTop} /></group>
-    <group ref={card} visible={false} position={[0, 1.04, 1.72]}>
-      <Block size={[.87, .78, .055]} color="#f5ede5" radius={.06} metal={.1} />
-      {photo && <mesh position={[0, .025, .035]}><planeGeometry args={[.70, .70]} /><meshBasicMaterial map={photo} toneMapped={false} /></mesh>}
-    </group>
-    <group ref={joystick} position={[-.67, 2.16, 1.52]}
-      onPointerDown={pointerStart}
-      onPointerMove={e => { if (drag.current && props.interactive) { e.stopPropagation(); props.onAim({ x: drag.current.aim.x + (e.clientX - drag.current.x) * .012, z: drag.current.aim.z + (e.clientY - drag.current.y) * .012 }); } }}
-      onPointerUp={e => { drag.current = null; (e.target as HTMLElement).releasePointerCapture(e.pointerId); }}
-      onLostPointerCapture={() => { drag.current = null; }}
-      onPointerOver={() => { if (props.interactive) gl.domElement.style.cursor = 'grab'; }} onPointerOut={() => { gl.domElement.style.cursor = ''; }}>
-      <Cylinder position={[0, .17, 0]} radius={.045} height={.34} color={chrome} />
-      <mesh position={[0, .36, 0]} castShadow><sphereGeometry args={[.14, 28, 20]} /><meshPhysicalMaterial color={mint} clearcoat={1} roughness={.2} metalness={.15} /></mesh>
-      <mesh position={[0, .28, 0]}><sphereGeometry args={[.25, 12, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
-    </group>
-    <group ref={grabButton} position={[.58, 2.23, 1.53]} onClick={e => { e.stopPropagation(); if (props.canGrab) props.onGrab(); }} onPointerOver={() => { if (props.canGrab) gl.domElement.style.cursor = 'pointer'; }} onPointerOut={() => { gl.domElement.style.cursor = ''; }}>
-      <Cylinder position={[0, 0, 0]} radius={.145} height={.055} color={mint} emissive={mint} />
-      <mesh position={[0,.025,0]} scale={[1,.28,1]}><sphereGeometry args={[.144,24,12]} /><meshPhysicalMaterial color={mint} emissive={mint} emissiveIntensity={.6} roughness={.16} clearcoat={1} /></mesh>
-    </group>
+    {sceneContent}
   </>;
 }
 
@@ -322,5 +355,3 @@ export default function MachineScene(props: SceneProps) {
     </Canvas>
   </SceneBoundary>;
 }
-
-

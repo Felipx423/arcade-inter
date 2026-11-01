@@ -1,5 +1,5 @@
 import { prefersReducedMotion } from './motion';
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import MachineScene from './MachineScene';
 import { boundAim, capsulePositions, nearestCapsule } from './controller';
 import * as storage from './storage';
@@ -36,6 +36,8 @@ export default function App() {
   const [gpu, setGPU] = useState(false);
   const [gpuFailed, setGPUFailed] = useState(false);
   const [aim, setAim] = useState<Aim>({ x: 0, z: 0 });
+  const aimRef = useRef<Aim>(aim);
+  aimRef.current = aim;
   const [status, setStatus] = useState('Acendendo as luzes do arcade…');
   const [toast, setToast] = useState('');
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -54,7 +56,7 @@ export default function App() {
   const [formKey, setFormKey] = useState(0);
   const preview = useBlobURL(file || editing?.photo);
   const drag = useRef<{ x: number; y: number; aim: Aim } | null>(null);
-  const total = totalOf(snapshot.prizes);
+  const total = useMemo(() => totalOf(snapshot.prizes), [snapshot.prizes]);
   const busy = phase === 'saving' || phase === 'animating';
   const interactive = gpu && phase === 'idle' && !managerOpen && !infoOpen && !saving;
 
@@ -85,7 +87,10 @@ export default function App() {
   }, [refresh, report]);
   const ready = useCallback(() => { gpuRef.current = true; setGPU(true); }, []);
   const unavailable = useCallback(() => { gpuRef.current = false; setGPU(false); setGPUFailed(true); finishDelivery(); }, [finishDelivery]);
-  const changeAim = useCallback((value: Aim) => setAim(boundAim(value)), []);
+  const changeAim = useCallback((value: Aim) => {
+    const next = boundAim(value);
+    setAim(prev => (Math.abs(prev.x - next.x) < 1e-5 && Math.abs(prev.z - next.z) < 1e-5 ? prev : next));
+  }, []);
 
   useEffect(() => {
     if (phase === 'idle') setStatus(total ? 'Mova a garra, escolha uma cápsula e aperte Pegar.' : 'Sua máquina está pronta. Cadastre os brindes para começar.');
@@ -107,10 +112,11 @@ export default function App() {
     const guard = { id: 'saving' } as Capture;
     activeCapture.current = guard;
     try {
+      const currentAim = aimRef.current;
       const positions = liveCapsules.current.length === Math.min(12, total)
         ? liveCapsules.current.map(p => ({ ...p }))
         : capsulePositions(total).map(p => ({ ...p, y: 2.385 }));
-      const targetIndex = nearestCapsule(positions, aim);
+      const targetIndex = nearestCapsule(positions, currentAim);
       const result = await storage.drawPrize(database.current);
       const request: Capture = { id: result.id, result, target: positions[targetIndex], targetY: positions[targetIndex].y, targetIndex, count: total, reduced: prefersReducedMotion() };
       setSnapshot(await storage.readSnapshot(database.current));
@@ -118,7 +124,9 @@ export default function App() {
       if (!gpuRef.current) { finishDelivery(); return; }
       setCapture(request); setPhase('animating');
     } catch (error) { activeCapture.current = null; setCapture(null); const saved = await refresh().catch(() => undefined); setPhase(saved?.result ? 'revealed' : 'idle'); report(error); }
-  }, [phase, managerOpen, infoOpen, saving, total, aim, finishDelivery, refresh, report]);
+  }, [phase, managerOpen, infoOpen, saving, total, finishDelivery, refresh, report]);
+
+  const handleGrab = useCallback(() => { void grab(); }, [grab]);
 
   const next = useCallback(async () => {
     if (!database.current || phase !== 'revealed' || saving) return;
@@ -137,7 +145,10 @@ export default function App() {
       const delta = Math.min((time - (last || time)) / 1000, .05); last = time;
       const x = (keys.has('ArrowRight') || keys.has('d') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('a') ? 1 : 0);
       const z = (keys.has('ArrowDown') || keys.has('s') ? 1 : 0) - (keys.has('ArrowUp') || keys.has('w') ? 1 : 0);
-      if (x || z) setAim(previous => boundAim({ x: previous.x + x * delta * 1.8, z: previous.z + z * delta * 1.4 }));
+      if (x || z) setAim(previous => {
+        const nextAim = boundAim({ x: previous.x + x * delta * 1.8, z: previous.z + z * delta * 1.4 });
+        return Math.abs(previous.x - nextAim.x) < 1e-5 && Math.abs(previous.z - nextAim.z) < 1e-5 ? previous : nextAim;
+      });
       if (keys.size) frame = requestAnimationFrame(tick); else { frame = 0; last = 0; }
     };
     const down = (event: KeyboardEvent) => {
@@ -173,16 +184,16 @@ export default function App() {
     if (!infoOpen && info.current?.open) info.current.close();
   }, [infoOpen]);
 
-  const resetForm = () => { setEditing(null); setName(''); setQuantity('1'); setFile(null); setFormKey(key => key + 1); };
+  const resetForm = useCallback(() => { setEditing(null); setName(''); setQuantity('1'); setFile(null); setFormKey(key => key + 1); }, []);
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (!database.current || saving) return; setSaving(true);
     try { await validatePhoto(file); await storage.savePrize(database.current, { id: editing?.id, name, quantity: Number(quantity), photo: file }); await refresh(); resetForm(); notify(editing ? 'Brinde atualizado.' : 'Brinde cadastrado!'); }
     catch (error) { report(error); } finally { setSaving(false); }
   };
-  const restock = async (prize: Prize) => {
+  const restock = useCallback(async (prize: Prize) => {
     if (!database.current || saving) return; setSaving(true);
     try { await storage.restockPrize(database.current, prize.id); await refresh(); if (editing?.id === prize.id) setQuantity(String(prize.quantity + 1)); notify('Mais uma unidade no estoque!'); } catch (error) { report(error); } finally { setSaving(false); }
-  };
+  }, [saving, refresh, editing?.id, notify, report]);
   const remove = async () => {
     if (!database.current || !toDelete || saving) return; setSaving(true);
     try { await storage.removePrize(database.current, toDelete.id); await refresh(); if (editing?.id === toDelete.id) resetForm(); setToDelete(null); notify('Brinde excluído.'); } catch (error) { report(error); } finally { setSaving(false); }
@@ -197,7 +208,20 @@ export default function App() {
       await storage.addExamples(database.current, records); await refresh(); notify('Exemplos carregados. Pode voltar à máquina!');
     } catch (error) { report(error); } finally { setSaving(false); }
   };
-  const step = (dx: number, dz: number) => { if (interactive) setAim(previous => boundAim({ x: previous.x + dx, z: previous.z + dz })); };
+  const step = (dx: number, dz: number) => { if (interactive) changeAim({ x: aimRef.current.x + dx, z: aimRef.current.z + dz }); };
+
+  const prizeGallery = useMemo(() => (
+    <div className="prize-gallery">
+      {snapshot.prizes.filter(p => p.quantity > 0).map(p => <article key={p.id}><BlobImage blob={p.photo} alt={p.name} /><h3>{p.name}</h3><p>{fmt(p.quantity)} disponíveis</p></article>)}
+      {!total && <p>Os próximos brindes aparecem aqui assim que a máquina for abastecida.</p>}
+    </div>
+  ), [snapshot.prizes, total]);
+
+  const inventoryList = useMemo(() => (
+    <div className="inventory-list">
+      {snapshot.prizes.map(prize => <article className="inventory-card" key={prize.id}><BlobImage blob={prize.photo} alt={prize.name} /><div className="inventory-info"><h4>{prize.name}</h4><p>{prize.quantity ? `${fmt(prize.quantity)} ${prize.quantity === 1 ? 'unidade' : 'unidades'}` : 'Esgotado'}<span>{total && prize.quantity ? `${(prize.quantity / total * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% de chance` : 'Fora do sorteio'}</span></p></div><div className="inventory-actions"><button disabled={saving} aria-label={`Repor uma unidade: ${prize.name}`} onClick={() => void restock(prize)}>+1 unidade</button><button disabled={saving} aria-label={`Editar: ${prize.name}`} onClick={() => { setEditing(prize); setName(prize.name); setQuantity(String(prize.quantity)); setFile(null); setFormKey(key => key + 1); manager.current?.querySelector('.manager-content')?.scrollTo({ top: 0, behavior: 'smooth' }); }}>Editar</button><button className="delete-button" disabled={saving} aria-label={`Excluir: ${prize.name}`} onClick={() => setToDelete(prize)}>Excluir</button></div></article>)}
+    </div>
+  ), [snapshot.prizes, total, saving, restock]);
 
   return <div className="app-shell">
     <a className="skip-link" href="#game-controls">Pular para os controles</a>
@@ -213,7 +237,7 @@ export default function App() {
     <main className="arcade-main" aria-label="Arcade Pega!">
       <div className="scene-host" aria-label="Máquina de garra 3D, vista frontal">
         <MachineScene total={total} aim={aim} capture={capture} result={phase === 'revealed' ? snapshot.result : null} interactive={interactive} canGrab={interactive && total > 0}
-          onAim={changeAim} onPositions={updateCapsules} onGrab={() => void grab()} onDelivered={finishDelivery} onReady={ready} onUnavailable={unavailable} onStatus={setStatus} />
+          onAim={changeAim} onPositions={updateCapsules} onGrab={handleGrab} onDelivered={finishDelivery} onReady={ready} onUnavailable={unavailable} onStatus={setStatus} />
       </div>
       {phase === 'idle' && !total && <div className="empty-callout"><strong>{snapshot.prizes.length ? 'Brindes esgotados' : 'A próxima surpresa é sua.'}</strong><p>Abasteça a máquina para começar a jogar.</p><button onClick={() => setManagerOpen(true)}>Adicionar brindes</button></div>}
       {gpuFailed && <div className="gpu-note" role="alert">O 3D está indisponível. Seus dados estão preservados. Você pode continuar organizando os brindes.</div>}
@@ -222,7 +246,7 @@ export default function App() {
     <section className="control-dock" id="game-controls" aria-label="Controles da garra">
       <div className="joystick-wrap">
         <div className={`joystick-pad ${!interactive ? 'is-disabled' : ''}`} role="slider" tabIndex={interactive ? 0 : -1} aria-label="Joystick da garra. Arraste ou use setas e WASD" aria-valuemin={-100} aria-valuemax={100} aria-valuenow={Math.round(aim.x / 1.12 * 100)} aria-valuetext={`Horizontal ${Math.round(aim.x / 1.12 * 100)}%, profundidade ${Math.round(aim.z / .72 * 100)}%`} aria-disabled={!interactive}
-          onPointerDown={event => { if (!interactive) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY, aim: { ...aim } }; event.currentTarget.focus(); }}
+          onPointerDown={event => { if (!interactive) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY, aim: { ...aimRef.current } }; event.currentTarget.focus(); }}
           onPointerMove={event => { if (drag.current && interactive) changeAim({ x: drag.current.aim.x + (event.clientX - drag.current.x) * .025, z: drag.current.aim.z + (event.clientY - drag.current.y) * .02 }); }}
           onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
           <span className="joystick-indicator" style={{ transform: `translate(${aim.x / 1.12 * 5}px, ${aim.z / .72 * 5}px)` }}><Icon name="joystick" /></span>
@@ -245,7 +269,7 @@ export default function App() {
 
     <dialog ref={info} className="info-dialog" onCancel={() => setInfoOpen(null)} onClose={() => setInfoOpen(null)} aria-labelledby="info-title">
       <div className="info-heading"><h2 id="info-title">{infoOpen === 'help' ? 'Como funciona' : 'Dentro da máquina'}</h2><button className="icon-button" aria-label="Fechar informações" onClick={() => setInfoOpen(null)}><Icon name="x" /></button></div>
-      {infoOpen === 'help' ? <div className="how-it-works"><p>Uma cápsula. Uma boa surpresa.</p><ol><li><strong>Mova a garra.</strong><span>Arraste o joystick da máquina ou da barra. Também vale usar as setas, WASD ou os botões de direção.</span></li><li><strong>Aperte Pegar.</strong><span>A garra busca a cápsula mais próxima da mira e entrega seu brinde. Você também pode usar Enter.</span></li><li><strong>Descubra seu prêmio.</strong><span>O brinde é sempre aleatório: cada unidade disponível tem uma chance, independentemente da mira.</span></li></ol><p className="info-footnote">O resultado fica salvo até você escolher Próximo sorteio. A máquina funciona offline neste navegador.</p></div> : <div className="prize-gallery">{snapshot.prizes.filter(p => p.quantity > 0).map(p => <article key={p.id}><BlobImage blob={p.photo} alt={p.name} /><h3>{p.name}</h3><p>{fmt(p.quantity)} disponíveis</p></article>)}{!total && <p>Os próximos brindes aparecem aqui assim que a máquina for abastecida.</p>}</div>}
+      {infoOpen === 'help' ? <div className="how-it-works"><p>Uma cápsula. Uma boa surpresa.</p><ol><li><strong>Mova a garra.</strong><span>Arraste o joystick da máquina ou da barra. Também vale usar as setas, WASD ou os botões de direção.</span></li><li><strong>Aperte Pegar.</strong><span>A garra busca a cápsula mais próxima da mira e entrega seu brinde. Você também pode usar Enter.</span></li><li><strong>Descubra seu prêmio.</strong><span>O brinde é sempre aleatório: cada unidade disponível tem uma chance, independentemente da mira.</span></li></ol><p className="info-footnote">O resultado fica salvo até você escolher Próximo sorteio. A máquina funciona offline neste navegador.</p></div> : prizeGallery}
     </dialog>
 
     <dialog className="manager-dialog" ref={manager} onCancel={() => setManagerOpen(false)} onClose={() => setManagerOpen(false)} aria-labelledby="manager-title">
@@ -259,7 +283,7 @@ export default function App() {
         </form>
         <div className="inventory-title"><h3>Na máquina</h3><span>{fmt(total)} unidades</span></div>
         {!snapshot.prizes.length && <div className="inventory-empty"><strong>A primeira surpresa começa aqui.</strong><p>Cadastre um brinde com foto ou experimente as ilustrações de exemplo.</p><button className="secondary-button" onClick={() => void examples()} disabled={saving || !database.current}>Carregar exemplos ilustrativos</button></div>}
-        <div className="inventory-list">{snapshot.prizes.map(prize => <article className="inventory-card" key={prize.id}><BlobImage blob={prize.photo} alt={prize.name} /><div className="inventory-info"><h4>{prize.name}</h4><p>{prize.quantity ? `${fmt(prize.quantity)} ${prize.quantity === 1 ? 'unidade' : 'unidades'}` : 'Esgotado'}<span>{total && prize.quantity ? `${(prize.quantity / total * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% de chance` : 'Fora do sorteio'}</span></p></div><div className="inventory-actions"><button disabled={saving} aria-label={`Repor uma unidade: ${prize.name}`} onClick={() => void restock(prize)}>+1 unidade</button><button disabled={saving} aria-label={`Editar: ${prize.name}`} onClick={() => { setEditing(prize); setName(prize.name); setQuantity(String(prize.quantity)); setFile(null); setFormKey(key => key + 1); manager.current?.querySelector('.manager-content')?.scrollTo({ top: 0, behavior: 'smooth' }); }}>Editar</button><button className="delete-button" disabled={saving} aria-label={`Excluir: ${prize.name}`} onClick={() => setToDelete(prize)}>Excluir</button></div></article>)}</div>
+        {inventoryList}
         <p className="storage-note">As fotos e o estoque ficam neste navegador. Limpar os dados do site apaga o cadastro. A posição da garra não altera as chances do sorteio.</p>
       </div>
     </dialog>

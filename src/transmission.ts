@@ -16,8 +16,11 @@ export function transmissionRegion(scene: THREE.Object3D, camera: THREE.Camera, 
       if (!(m.transmission > 0)) continue;
       found = true;
       if (!m.userData.pegaCapsule || m.roughness > .2 || m.roughnessMap || m.normalMap || m.bumpMap || m.dispersion > 0) { fallback = true; continue; }
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      box.copy(mesh.geometry.boundingBox!).applyMatrix4(mesh.matrixWorld);
+      const instancedBounds = (mesh as THREE.InstancedMesh).boundingBox;
+      if (!instancedBounds && !mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      const sourceBounds = instancedBounds ?? mesh.geometry.boundingBox!;
+      if ( sourceBounds.isEmpty() ) continue;
+      box.copy(sourceBounds).applyMatrix4(mesh.matrixWorld);
       mesh.getWorldScale(scale); box.expandByScalar(m.thickness * Math.max(scale.x, scale.y, scale.z));
       for (let i=0;i<8;i++) {
         point.set(i&1 ? box.max.x : box.min.x, i&2 ? box.max.y : box.min.y, i&4 ? box.max.z : box.min.z);
@@ -28,7 +31,7 @@ export function transmissionRegion(scene: THREE.Object3D, camera: THREE.Camera, 
       }
     }
   });
-  if (fallback || !found) return full;
+  if (fallback || !found || minX > maxX || minY > maxY) return full;
   // Full-size radiance target: restrict rasterization, with a generous mip/filter halo.
   const padding = Math.max(64, 4 * 2 ** Math.ceil(Math.log2(Math.max(width,height)) * .4));
   const x=Math.max(0,Math.floor((minX*.5+.5)*width-padding));
@@ -43,7 +46,34 @@ export function installTransmissionRegion(gl: THREE.WebGLRenderer) {
   const setTarget = gl.setRenderTarget as (target: THREE.WebGLRenderTarget<THREE.Texture | THREE.Texture[]> | null, face?: number, mip?: number) => void;
   let activeScene: THREE.Object3D | null = null, activeCamera: THREE.Camera | null = null;
   const targets = new Set<{ scissor: THREE.Vector4; scissorTest: boolean; width: number; height: number }>();
-  gl.render = function (scene, camera) { const previousScene=activeScene, previousCamera=activeCamera; activeScene=scene; activeCamera=camera; try { return render.call(gl,scene,camera); } finally { activeScene=previousScene; activeCamera=previousCamera; } };
+  const swapped: { mesh: THREE.Mesh; original: THREE.Material }[] = [];
+  gl.render = function (scene, camera) {
+    const previousScene = activeScene, previousCamera = activeCamera;
+    activeScene = scene; activeCamera = camera;
+    const currentTarget = gl.getRenderTarget();
+    const isOffscreenReflection = currentTarget !== null && currentTarget.width <= 512 && currentTarget.textures.length === 1;
+    if (isOffscreenReflection) {
+      scene.traverseVisible(object => {
+        const mesh = object as THREE.Mesh;
+        const mat = mesh.material as THREE.Material | undefined;
+        const reflectMat = mat && !Array.isArray(mat) ? (mat.userData?.reflectionMaterial as THREE.Material | undefined) : undefined;
+        if (reflectMat) {
+          swapped.push({ mesh, original: mat! });
+          mesh.material = reflectMat;
+        }
+      });
+    }
+    try {
+      return render.call(gl, scene, camera);
+    } finally {
+      while (swapped.length) {
+        const item = swapped.pop()!;
+        item.mesh.material = item.original;
+      }
+      activeScene = previousScene;
+      activeCamera = previousCamera;
+    }
+  };
   gl.setRenderTarget = function (target, face, mip) {
     if (target && target.samples >= 4 && !Array.isArray(target.texture) && target.texture.generateMipmaps && target.depthBuffer && activeScene && activeCamera) {
       const region = transmissionRegion(activeScene,activeCamera,target.width,target.height);

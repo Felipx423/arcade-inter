@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import { ArcadeRoom, Block, Cabinet, Cylinder, type V3 } from './SceneObjects';
 import { capsulePositions, ease, mix, nearestCapsule } from './controller';
 import type { Aim, Capture, CapsulePose, DrawResult } from './types';
-import { advanceWorld, createBall, createWorld, FLOOR_Y, kickBall, type BallWorld } from './physics';
+import { advanceWorld, createBall, createWorld, FLOOR_Y, type BallWorld } from './physics';
 
 const colors = ['#001D89', '#56D867', '#FFF8E1', '#dce9d3'];
 const chrome = '#c6cac5';
@@ -300,15 +300,7 @@ function World(props: SceneProps) {
         </group>)}
       </group>
       <group ref={pool}>
-        {positions.map((_, i) => <group key={i}
-          onClick={e => {
-            if (!propsRef.current.interactive || reducedMotion) return;
-            e.stopPropagation();
-            const b = world.balls[i];
-            kickBall(world, i, (b.x - e.point.x) * 4 + .30, (b.z - e.point.z) * 4 - .25); invalidate();
-          }}
-          onPointerOver={() => { if (propsRef.current.interactive) gl.domElement.style.cursor = 'pointer'; }}
-          onPointerOut={() => { gl.domElement.style.cursor = ''; }}>
+        {positions.map((_, i) => <group key={i}>
           <Capsule assets={capsuleAssets} color={colors[world.balls[i]?.colorIndex ?? i % colors.length]} />
         </group>)}
       </group>
